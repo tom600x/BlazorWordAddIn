@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  Office Add-in Manifest — Classic XML (Add-in Only Manifest) format.
+  This format is used for GCC deployments via Centralized Deployment / SharePoint catalog.
+  
+  REPLACE THESE VALUES before deployment:
+    REPLACE_ADDIN_MANIFEST_GUID  — Generate a new GUID (e.g., via [System.Guid]::NewGuid() in PowerShell)
+    REPLACE_ADDIN_CLIENT_ID      — Entra app registration Client ID
+    REPLACE_APP_HOSTNAME         — Azure App Service hostname (e.g., snippets-app.azurewebsites.net)
+-->
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <!-- Unique GUID for this add-in. Generate a new one: [System.Guid]::NewGuid() -->
+  <Id>ea71142f-eec4-4531-8419-765678e0c703</Id>
+  <Version>1.0.0.1</Version>
+  <ProviderName>Contoso</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Word Snippets"/>
+  <Description DefaultValue="Insert reusable text and image snippets into Word documents. Requires sign-in with your organization account."/>
+  <IconUrl DefaultValue="https://tomwordaddin.azurewebsites.net/assets/icon-80.png"/>
+  <HighResolutionIconUrl DefaultValue="https://tomwordaddin.azurewebsites.net/assets/icon-80.png"/>
+  <SupportUrl DefaultValue="https://tomwordaddin.azurewebsites.net/support"/>
+
+  <!-- Allow the task pane and API to be loaded from these domains -->
+  <AppDomains>
+    <AppDomain>https://tomwordaddin.azurewebsites.net</AppDomain>
+    <!-- Add any CDN or external domains here if needed -->
+    <!-- GCC note: verify all domains are accessible within the GCC network boundary -->
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Document"/>
+  </Hosts>
+
+  <!-- Legacy task pane launch URL (used when VersionOverrides is not supported) -->
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://tomwordaddin.azurewebsites.net/"/>
+  </DefaultSettings>
+
+  <!-- ReadWriteDocument is required to insert text and images -->
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <!-- VersionOverrides: defines ribbon buttons and SSO configuration -->
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+
+          <!-- GetStarted card shown first time the add-in is installed -->
+          <GetStarted>
+            <Title resid="GetStarted.Title"/>
+            <Description resid="GetStarted.Description"/>
+            <LearnMoreUrl resid="HelpUrl"/>
+          </GetStarted>
+
+          <!-- Ribbon button in the Home tab -->
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="SnippetsGroup">
+                <Label resid="SnippetsGroup.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16"/>
+                  <bt:Image size="32" resid="Icon.32x32"/>
+                  <bt:Image size="80" resid="Icon.80x80"/>
+                </Icon>
+                <Control xsi:type="Button" id="OpenSnippetsButton">
+                  <Label resid="OpenButton.Label"/>
+                  <Supertip>
+                    <Title resid="OpenButton.Label"/>
+                    <Description resid="OpenButton.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>SnippetsTaskpane</TaskpaneId>
+                    <SourceLocation resid="TaskpaneUrl"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <!-- Resource definitions -->
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://tomwordaddin.azurewebsites.net/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://tomwordaddin.azurewebsites.net/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://tomwordaddin.azurewebsites.net/assets/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="TaskpaneUrl"    DefaultValue="https://tomwordaddin.azurewebsites.net/"/>
+        <bt:Url id="HelpUrl"        DefaultValue="https://tomwordaddin.azurewebsites.net/help"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title"    DefaultValue="Get started with Word Snippets"/>
+        <bt:String id="SnippetsGroup.Label" DefaultValue="Snippets"/>
+        <bt:String id="OpenButton.Label"    DefaultValue="Open Snippets"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Open the task pane to insert reusable text and image snippets into your document."/>
+        <bt:String id="OpenButton.Tooltip"     DefaultValue="Open the Word Snippets task pane to browse and insert snippets."/>
+      </bt:LongStrings>
+    </Resources>
+
+    <!--
+      SSO / WebApplicationInfo
+      ========================
+      The <Id> must match the Entra app registration Client ID.
+      The <Resource> must match the Application ID URI configured in Entra (Expose an API).
+      Office will request a token with this resource and pass it to the add-in.
+      
+      Office clients pre-authorized in the app registration (see docs/Admin-Setup.md):
+        d3590ed6-52b3-4102-aeff-aad2292ab01c  (Office desktop)
+        93d53678-613d-4013-afc3-0ebc4b444d30  (Office on the web)
+        57fb890c-0dab-4253-a5e0-7188c88b2bb4  (Office on iOS)
+        08e18876-6177-487e-b8b5-cf950c1e598c  (Office on Android)
+    -->
+    <WebApplicationInfo>
+      <Id>c7806dca-7fab-4e78-bf17-d3f977b3eea4</Id>
+      <Resource>api://tomwordaddin.azurewebsites.net/c7806dca-7fab-4e78-bf17-d3f977b3eea4</Resource>
+      <Scopes>
+        <Scope>openid</Scope>
+        <Scope>profile</Scope>
+        <Scope>User.Read</Scope>
+        <Scope>offline_access</Scope>
+      </Scopes>
+    </WebApplicationInfo>
+
+  </VersionOverrides>
+</OfficeApp>

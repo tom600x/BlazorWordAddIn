@@ -1,0 +1,389 @@
+@page "/"
+@page "/index.html"
+@inject ApiService ApiService
+@inject OfficeInteropService OfficeInterop
+
+<PageTitle>Word Snippets</PageTitle>
+
+<!-- ================================================================
+     HEADER — shows app title and the signed-in user
+     ================================================================ -->
+<div class="header">
+    <h1>Word Snippets</h1>
+    @if (userInfo is not null)
+    {
+        <div class="user-bar">
+            <span class="user-name">@(userInfo.DisplayName ?? userInfo.Upn)</span>
+            <button class="btn-refresh" @onclick="RefreshAsync" disabled="@isLoading">↺ Refresh</button>
+        </div>
+    }
+</div>
+
+<!-- ================================================================
+     MESSAGES — error / success banners
+     ================================================================ -->
+@if (needsSignIn)
+{
+    <div class="signin-prompt">
+        <p>Sign in to load your snippets.</p>
+        <button class="btn-signin" @onclick="SignInAsync" disabled="@isLoading">Sign In</button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="error-banner">@errorMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="success-banner">@successMessage</div>
+}
+
+@if (!isInOffice)
+{
+    <div class="warning-banner">
+        ⚠ Running outside Word. Word insertion will not work. Office must be present for SSO and document editing.
+    </div>
+}
+
+<!-- ================================================================
+     LOADING
+     ================================================================ -->
+@if (isLoading)
+{
+    <div class="loading-text">
+        <span class="spinner-sm"></span> Loading snippets…
+    </div>
+}
+else
+{
+    <!-- ============================================================
+         TAB BAR
+         ============================================================ -->
+    <div class="tab-bar">
+        <button class="@TabClass("text")"   @onclick='() => SetTab("text")'>📝 Text</button>
+        <button class="@TabClass("images")" @onclick='() => SetTab("images")'>🖼 Images</button>
+    </div>
+
+    <!-- ============================================================
+         TEXT SNIPPETS TAB
+         ============================================================ -->
+    @if (activeTab == "text")
+    {
+        <div class="tab-content">
+            <div class="search-box">
+                <input class="search-input"
+                       type="search"
+                       placeholder="Search text snippets…"
+                       @bind="textSearch"
+                       @bind:event="oninput"
+                       aria-label="Search text snippets" />
+            </div>
+
+            @if (filteredTextSnippets.Count == 0)
+            {
+                <p class="empty-text">No text snippets found.</p>
+            }
+            else
+            {
+                <div class="snippet-list">
+                    @foreach (var snippet in filteredTextSnippets)
+                    {
+                        <div class="snippet-card">
+                            <div class="snippet-header">
+                                <span class="snippet-title">@snippet.Title</span>
+                                <button class="btn-insert"
+                                        @onclick="() => InsertTextAsync(snippet)"
+                                        disabled="@isInserting">
+                                    Insert
+                                </button>
+                            </div>
+                            <div class="snippet-preview">@snippet.BodyText</div>
+                            @if (!string.IsNullOrWhiteSpace(snippet.Tags))
+                            {
+                                <div class="snippet-tags">🏷 @snippet.Tags</div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ============================================================
+         IMAGE SNIPPETS TAB
+         ============================================================ -->
+    @if (activeTab == "images")
+    {
+        <div class="tab-content">
+            <div class="search-box">
+                <input class="search-input"
+                       type="search"
+                       placeholder="Search image snippets…"
+                       @bind="imageSearch"
+                       @bind:event="oninput"
+                       aria-label="Search image snippets" />
+            </div>
+
+            @if (filteredImageSnippets.Count == 0)
+            {
+                <p class="empty-text">No image snippets found.</p>
+            }
+            else
+            {
+                <div class="snippet-list">
+                    @foreach (var snippet in filteredImageSnippets)
+                    {
+                        <div class="snippet-card">
+                            <div class="snippet-header">
+                                <span class="snippet-title">@snippet.Title</span>
+                                <button class="btn-insert"
+                                        @onclick="() => InsertImageAsync(snippet)"
+                                        disabled="@isInserting">
+                                    Insert
+                                </button>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(snippet.Tags))
+                            {
+                                <div class="snippet-tags">🏷 @snippet.Tags</div>
+                            }
+                            <div class="snippet-preview">@snippet.MimeType</div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    // -----------------------------------------------------------------------
+    // State
+    // -----------------------------------------------------------------------
+    private UserInfoDto? userInfo;
+    private List<TextSnippetDto> textSnippets = new();
+    private List<ImageSnippetDto> imageSnippets = new();
+
+    private string activeTab = "text";
+    private string textSearch = string.Empty;
+    private string imageSearch = string.Empty;
+
+    private bool isLoading = true;
+    private bool isInserting = false;
+    private bool isInOffice = true;
+    private bool needsSignIn = false;
+
+    private string? errorMessage;
+    private string? successMessage;
+
+    // -----------------------------------------------------------------------
+    // Filtered views
+    // -----------------------------------------------------------------------
+    private List<TextSnippetDto> filteredTextSnippets =>
+        string.IsNullOrWhiteSpace(textSearch)
+            ? textSnippets
+            : textSnippets
+                .Where(s => s.Title.Contains(textSearch, StringComparison.OrdinalIgnoreCase)
+                         || s.BodyText.Contains(textSearch, StringComparison.OrdinalIgnoreCase)
+                         || (s.Tags?.Contains(textSearch, StringComparison.OrdinalIgnoreCase) ?? false))
+                .ToList();
+
+    private List<ImageSnippetDto> filteredImageSnippets =>
+        string.IsNullOrWhiteSpace(imageSearch)
+            ? imageSnippets
+            : imageSnippets
+                .Where(s => s.Title.Contains(imageSearch, StringComparison.OrdinalIgnoreCase)
+                         || (s.Tags?.Contains(imageSearch, StringComparison.OrdinalIgnoreCase) ?? false))
+                .ToList();
+
+    // -----------------------------------------------------------------------
+    // Lifecycle
+    // -----------------------------------------------------------------------
+    protected override async Task OnInitializedAsync()
+    {
+        isInOffice = await OfficeInterop.IsInOfficeAsync();
+
+        // When running outside an Office host, avoid calling the backend API so the
+        // task pane doesn't hang waiting for authentication or network redirects.
+        if (!isInOffice)
+        {
+            isLoading = false;
+            return;
+        }
+
+        await LoadDataAsync();
+    }
+
+    // -----------------------------------------------------------------------
+    // Data loading
+    // -----------------------------------------------------------------------
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            // Sequential calls so each SetAuthHeaderAsync completes before the next
+            // request starts — avoids concurrent writes to DefaultRequestHeaders.
+            userInfo      = await ApiService.GetMeAsync();
+            textSnippets  = await ApiService.GetTextSnippetsAsync();
+            imageSnippets = await ApiService.GetImageSnippetsAsync();
+        }
+        catch (OfficeAuthException)
+        {
+            // Office SSO failed (common in Word Online) — ask the user to sign in
+            // via the MSAL fallback button, which must be triggered by a direct click.
+            needsSignIn = true;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            ApiService.InvalidateToken();
+            // Show the actual server response to help diagnose claim / JWT validation issues.
+            errorMessage = $"Auth failed (401): {ex.Message}";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"API error {(int?)ex.StatusCode}: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load snippets ({ex.GetType().Name}): {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        ApiService.InvalidateToken();
+        needsSignIn = false;
+        await LoadDataAsync();
+    }
+
+    private async Task SignInAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        needsSignIn = false;
+        StateHasChanged();
+
+        try
+        {
+            // Open the MSAL dialog — must be called from a direct user click so the
+            // browser allows the popup window to open (user-gesture requirement).
+            var token = await OfficeInterop.GetMsalTokenAsync();
+            ApiService.SetCachedToken(token);
+
+            // Brief yield after dialog close before making API calls — Office needs a
+            // moment to clean up the dialog context before network requests work reliably.
+            await Task.Delay(600);
+
+            await LoadDataAsync();
+        }
+        catch (OfficeAuthException ex)
+        {
+            errorMessage = $"Sign-in failed: {ex.Message}";
+            isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Sign-in failed: {ex.Message}";
+            isLoading = false;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Insert actions
+    // -----------------------------------------------------------------------
+    private async Task InsertTextAsync(TextSnippetDto snippet)
+    {
+        isInserting = true;
+        errorMessage = null;
+        successMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var ok = await OfficeInterop.InsertTextAsync(snippet.BodyText);
+            if (ok)
+                successMessage = $"✔ Inserted \"{snippet.Title}\"";
+            else
+                errorMessage = "Failed to insert text. Make sure Word is in focus.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Insert failed: {ex.Message}";
+        }
+        finally
+        {
+            isInserting = false;
+            // Auto-clear success banner after 3 seconds
+            if (successMessage is not null)
+                _ = ClearSuccessAfterDelayAsync();
+        }
+    }
+
+    private async Task InsertImageAsync(ImageSnippetDto snippet)
+    {
+        isInserting = true;
+        errorMessage = null;
+        successMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            // Fetch the full Base64 content on-demand to keep the list lean
+            var content = await ApiService.GetImageContentAsync(snippet.Id);
+            if (content is null)
+            {
+                errorMessage = "Image content could not be loaded.";
+                return;
+            }
+
+            var ok = await OfficeInterop.InsertImageAsync(content.ImageBase64);
+            if (ok)
+                successMessage = $"✔ Inserted \"{snippet.Title}\"";
+            else
+                errorMessage = "Failed to insert image. Make sure Word is in focus.";
+        }
+        catch (OfficeAuthException)
+        {
+            // Token expired during insert — ask user to sign in again.
+            needsSignIn = true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Insert failed: {ex.Message}";
+        }
+        finally
+        {
+            isInserting = false;
+            if (successMessage is not null)
+                _ = ClearSuccessAfterDelayAsync();
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+    private void SetTab(string tab)
+    {
+        activeTab = tab;
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private string TabClass(string tab) => tab == activeTab ? "tab-btn active" : "tab-btn";
+
+    private async Task ClearSuccessAfterDelayAsync()
+    {
+        await Task.Delay(3000);
+        successMessage = null;
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign In – Word Snippets</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: #f3f3f3;
+        }
+        .container { text-align: center; padding: 2rem; }
+        .spinner {
+            border: 3px solid #ccc;
+            border-top-color: #0078d4;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error { color: #d13438; }
+    </style>
+</head>
+<body>
+    <!--
+        This page is opened as a dialog by the Word Snippets task pane when Office SSO
+        fails (e.g. in Word Online where the Office-on-the-web client is not pre-authorised).
+
+        Flow:
+          1. Task pane calls Office.context.ui.displayDialogAsync('/auth.html')
+          2. This page loads, initialises MSAL, and calls loginRedirect()
+          3. AAD redirects the dialog window to login.microsoftonline.com
+          4. After sign-in, AAD redirects back here with an auth code
+          5. handleRedirectPromise() resolves with an access token
+          6. We call Office.context.ui.messageParent() to pass the token back
+          7. The task pane receives the token, stores it, and closes the dialog
+    -->
+
+    <!-- Office.js is required for messageParent() to work in a dialog window -->
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <!-- MSAL Browser (served locally to avoid CSP and CDN availability issues) -->
+    <script src="js/msal-browser.min.js"></script>
+
+    <div class="container">
+        <div class="spinner" id="spinner"></div>
+        <p id="status">Signing in…</p>
+    </div>
+
+    <script>
+        Office.onReady(async function () {
+            var CLIENT_ID  = 'c7806dca-7fab-4e78-bf17-d3f977b3eea4';
+            var TENANT_ID  = '17784004-2abc-4e6e-ade2-374b35b35643';
+            var SCOPE      = 'api://tomwordaddin.azurewebsites.net/c7806dca-7fab-4e78-bf17-d3f977b3eea4/access_as_user';
+            var REDIRECT   = window.location.origin + '/auth.html';
+
+            var msalConfig = {
+                auth: {
+                    clientId:    CLIENT_ID,
+                    authority:   'https://login.microsoftonline.com/' + TENANT_ID,
+                    redirectUri: REDIRECT
+                },
+                cache: {
+                    cacheLocation: 'sessionStorage',
+                    storeAuthStateInCookie: false
+                }
+            };
+
+            function sendToParent(payload) {
+                try {
+                    Office.context.ui.messageParent(JSON.stringify(payload));
+                } catch (e) {
+                    // Fallback for plain-browser testing (no Office host)
+                    console.log('[auth] would send to parent:', payload);
+                }
+            }
+
+            function showError(msg) {
+                document.getElementById('spinner').style.display = 'none';
+                var el = document.getElementById('status');
+                el.className = 'error';
+                el.textContent = msg;
+            }
+
+            try {
+                var msalInstance = await msal.PublicClientApplication.createPublicClientApplication(msalConfig);
+
+                // Check whether AAD has redirected back here with an auth code
+                var response = await msalInstance.handleRedirectPromise();
+                if (response && response.accessToken) {
+                    sendToParent({ status: 'success', token: response.accessToken });
+                    return;
+                }
+
+                // First visit — start the redirect to AAD sign-in
+                document.getElementById('status').textContent = 'Redirecting to sign-in…';
+                await msalInstance.loginRedirect({ scopes: [SCOPE] });
+
+            } catch (err) {
+                var msg = (err && err.message) ? err.message : String(err);
+                showError('Sign-in failed: ' + msg);
+                sendToParent({ status: 'error', message: msg });
+            }
+        });
+    </script>
+</body>
+</html>

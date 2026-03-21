@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Word Snippets</title>
+    <base href="/" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="assets/icon-16.png" />
+</head>
+<body>
+    <div id="app">
+        <!-- Loading indicator shown while Office and Blazor initialise -->
+        <div class="init-loading">
+            <div class="init-spinner"></div>
+            <p>Loading Word Snippets...</p>
+        </div>
+    </div>
+
+    <!-- Office interop helpers (Word.run, token acquisition) -->
+    <script src="js/officeInterop.js?v=5"></script>
+
+    <!-- Blazor WASM - autostart false so we control when it starts -->
+    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
+
+    <script>
+        (function () {
+            // Detect if we're likely running inside an Office host.
+            // Office add-ins run in an iframe; a plain browser tab is top-level.
+            var inIframe = (window !== window.parent);
+
+            window._officeHostInfo = { host: 'None', platform: 'Browser', version: 'N/A' };
+
+            function startBlazor() {
+                console.log('[index] Starting Blazor; hostInfo=', window._officeHostInfo);
+                Blazor.start().then(function () {
+                    console.log('[index] Blazor started');
+                }).catch(function (err) {
+                    console.error('Blazor start failed:', err);
+                    document.getElementById('app').innerHTML =
+                        '<div class="error-banner">Failed to load the add-in. Please reload the task pane.</div>';
+                });
+            }
+
+            if (inIframe) {
+                // Likely inside Office — load office.js and wait for onReady
+                console.log('[index] Running in iframe, loading office.js');
+                var s = document.createElement('script');
+                s.src = 'https://appsforoffice.microsoft.com/lib/1/hosted/office.js';
+                s.async = true;
+                s.onload = function () {
+                    console.log('[index] office.js loaded');
+                    if (typeof Office !== 'undefined' && typeof Office.onReady === 'function') {
+                        Office.onReady(function (info) {
+                            console.log('[index] Office.onReady fired', info);
+                            window._officeHostInfo = info;
+                            startBlazor();
+                        });
+                    } else {
+                        startBlazor();
+                    }
+                };
+                s.onerror = function () {
+                    console.warn('[index] office.js failed to load, starting Blazor anyway');
+                    startBlazor();
+                };
+                document.head.appendChild(s);
+            } else {
+                // Not in iframe — local dev in browser, skip office.js entirely
+                console.log('[index] Not in iframe (local dev), skipping office.js');
+                startBlazor();
+            }
+        })();
+    </script>
+</body>
+</html>

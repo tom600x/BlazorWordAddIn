@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SnippetsApi</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Hosts Blazor WASM — provides UseBlazorFrameworkFiles() -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="8.0.11" />
+
+    <!-- JWT validation using Microsoft.Identity.Web -->
+    <PackageReference Include="Microsoft.Identity.Web" Version="2.18.1" />
+
+    <!-- EF Core + Azure SQL -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design"     Version="8.0.11" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools"      Version="8.0.11" PrivateAssets="all" />
+
+    <!-- Managed Identity token acquisition -->
+    <PackageReference Include="Azure.Identity" Version="1.13.1" />
+  </ItemGroup>
+
+  <!--
+    The Api project hosts the Blazor WASM static output.
+    At publish time, the Blazor project is built first and its
+    wwwroot files are merged into this project's wwwroot.
+    UseBlazorFrameworkFiles() in Program.cs serves the _framework/ files.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="../blazor-ui/BlazorUI.csproj" />
+  </ItemGroup>
+
+</Project>
