@@ -54,3 +54,4 @@ infra/arm-output.json
 .terraform/
 *.tfstate
 *.tfstate.backup
+publish_out.zip

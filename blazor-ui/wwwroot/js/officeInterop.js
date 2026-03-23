@@ -150,7 +150,7 @@ window.officeInterop = {
             }
             var headers = { 'Accept': 'application/json' };
             if (token) headers['Authorization'] = 'Bearer ' + token;
-            var response = await fetch(url, { method: 'GET', headers: headers });
+            var response = await fetch(url, { method: 'GET', headers: headers, cache: 'no-store' });
             var body = await response.text();
             // Capture diagnostic header if present
             var authErr = response.headers.get('X-Auth-Error');
