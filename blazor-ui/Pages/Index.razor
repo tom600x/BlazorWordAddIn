@@ -1,5 +1,4 @@
 @page "/"
-@page "/index.html"
 @inject ApiService ApiService
 @inject OfficeInteropService OfficeInterop
 
@@ -22,14 +21,6 @@
 <!-- ================================================================
      MESSAGES — error / success banners
      ================================================================ -->
-@if (needsSignIn)
-{
-    <div class="signin-prompt">
-        <p>Sign in to load your snippets.</p>
-        <button class="btn-signin" @onclick="SignInAsync" disabled="@isLoading">Sign In</button>
-    </div>
-}
-
 @if (!string.IsNullOrEmpty(errorMessage))
 {
     <div class="error-banner">@errorMessage</div>
@@ -172,7 +163,6 @@ else
     private bool isLoading = true;
     private bool isInserting = false;
     private bool isInOffice = true;
-    private bool needsSignIn = false;
 
     private string? errorMessage;
     private string? successMessage;
@@ -203,15 +193,6 @@ else
     protected override async Task OnInitializedAsync()
     {
         isInOffice = await OfficeInterop.IsInOfficeAsync();
-
-        // When running outside an Office host, avoid calling the backend API so the
-        // task pane doesn't hang waiting for authentication or network redirects.
-        if (!isInOffice)
-        {
-            isLoading = false;
-            return;
-        }
-
         await LoadDataAsync();
     }
 
@@ -226,31 +207,29 @@ else
 
         try
         {
-            // Sequential calls so each SetAuthHeaderAsync completes before the next
-            // request starts — avoids concurrent writes to DefaultRequestHeaders.
-            userInfo      = await ApiService.GetMeAsync();
-            textSnippets  = await ApiService.GetTextSnippetsAsync();
-            imageSnippets = await ApiService.GetImageSnippetsAsync();
+            // Load user identity and snippets in parallel
+            var meTask = ApiService.GetMeAsync();
+            var textTask = ApiService.GetTextSnippetsAsync();
+            var imageTask = ApiService.GetImageSnippetsAsync();
+
+            await Task.WhenAll(meTask, textTask, imageTask);
+
+            userInfo = await meTask;
+            textSnippets = await textTask;
+            imageSnippets = await imageTask;
         }
-        catch (OfficeAuthException)
+        catch (OfficeAuthException ex)
         {
-            // Office SSO failed (common in Word Online) — ask the user to sign in
-            // via the MSAL fallback button, which must be triggered by a direct click.
-            needsSignIn = true;
+            errorMessage = ex.UserMessage;
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
             ApiService.InvalidateToken();
-            // Show the actual server response to help diagnose claim / JWT validation issues.
-            errorMessage = $"Auth failed (401): {ex.Message}";
-        }
-        catch (HttpRequestException ex)
-        {
-            errorMessage = $"API error {(int?)ex.StatusCode}: {ex.Message}";
+            errorMessage = "Your session has expired. Please close and reopen the task pane.";
         }
         catch (Exception ex)
         {
-            errorMessage = $"Failed to load snippets ({ex.GetType().Name}): {ex.Message}";
+            errorMessage = $"Failed to load snippets: {ex.Message}";
         }
         finally
         {
@@ -260,40 +239,8 @@ else
 
     private async Task RefreshAsync()
     {
-        needsSignIn = false;
+        ApiService.InvalidateToken();
         await LoadDataAsync();
-    }
-
-    private async Task SignInAsync()
-    {
-        isLoading = true;
-        errorMessage = null;
-        needsSignIn = false;
-        StateHasChanged();
-
-        try
-        {
-            // Open the MSAL dialog — must be called from a direct user click so the
-            // browser allows the popup window to open (user-gesture requirement).
-            var token = await OfficeInterop.GetMsalTokenAsync();
-            ApiService.SetCachedToken(token);
-
-            // Brief yield after dialog close before making API calls — Office needs a
-            // moment to clean up the dialog context before network requests work reliably.
-            await Task.Delay(600);
-
-            await LoadDataAsync();
-        }
-        catch (OfficeAuthException ex)
-        {
-            errorMessage = $"Sign-in failed: {ex.Message}";
-            isLoading = false;
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Sign-in failed: {ex.Message}";
-            isLoading = false;
-        }
     }
 
     // -----------------------------------------------------------------------
@@ -350,10 +297,9 @@ else
             else
                 errorMessage = "Failed to insert image. Make sure Word is in focus.";
         }
-        catch (OfficeAuthException)
+        catch (OfficeAuthException ex)
         {
-            // Token expired during insert — ask user to sign in again.
-            needsSignIn = true;
+            errorMessage = ex.UserMessage;
         }
         catch (Exception ex)
         {

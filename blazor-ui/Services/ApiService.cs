@@ -1,25 +1,25 @@
-using System.Text.Json;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using BlazorUI.Models;
 
 namespace BlazorUI.Services;
 
 /// <summary>
-/// Calls the backend API using the browser's native fetch() (via JS interop) to avoid
-/// Blazor WASM BrowserHttpHandler issues inside Office task pane iframes.
+/// Calls the backend API, automatically acquiring and attaching the Office SSO token
+/// as a Bearer header before each request.
 /// </summary>
 public class ApiService
 {
+    private readonly HttpClient _http;
     private readonly OfficeInteropService _officeInterop;
 
-    private static readonly JsonSerializerOptions JsonOptions =
-        new() { PropertyNameCaseInsensitive = true };
-
-    // Cache the token within the Blazor session.
-    // Token lifetime is typically 1 hour.
+    // Cache the token within the Blazor session to avoid repeated getAccessToken calls.
+    // Token lifetime is typically 1 hour; a real app would check expiry (the JWT "exp" claim).
     private string? _cachedToken;
 
-    public ApiService(OfficeInteropService officeInterop)
+    public ApiService(HttpClient http, OfficeInteropService officeInterop)
     {
+        _http = http;
         _officeInterop = officeInterop;
     }
 
@@ -29,11 +29,6 @@ public class ApiService
     /// </summary>
     public void InvalidateToken() => _cachedToken = null;
 
-    /// <summary>
-    /// Injects a token obtained externally (e.g. via MSAL fallback dialog).
-    /// </summary>
-    public void SetCachedToken(string token) => _cachedToken = token;
-
     // -------------------------------------------------------------------------
     // API methods
     // -------------------------------------------------------------------------
@@ -41,25 +36,24 @@ public class ApiService
     /// <summary>Gets the signed-in user's identity from the backend (GET /api/me).</summary>
     public async Task<UserInfoDto?> GetMeAsync()
     {
-        await EnsureTokenAsync();
-        var json = await _officeInterop.FetchJsonAsync("api/me", _cachedToken);
-        return JsonSerializer.Deserialize<UserInfoDto>(json, JsonOptions);
+        await SetAuthHeaderAsync();
+        return await _http.GetFromJsonAsync<UserInfoDto>("api/me");
     }
 
     /// <summary>Gets the text snippets accessible to the signed-in user.</summary>
     public async Task<List<TextSnippetDto>> GetTextSnippetsAsync()
     {
-        await EnsureTokenAsync();
-        var json = await _officeInterop.FetchJsonAsync("api/text-snippets", _cachedToken);
-        return JsonSerializer.Deserialize<List<TextSnippetDto>>(json, JsonOptions) ?? new();
+        await SetAuthHeaderAsync();
+        return await _http.GetFromJsonAsync<List<TextSnippetDto>>("api/text-snippets")
+               ?? new List<TextSnippetDto>();
     }
 
     /// <summary>Gets image snippet summaries (without the full Base64 payload).</summary>
     public async Task<List<ImageSnippetDto>> GetImageSnippetsAsync()
     {
-        await EnsureTokenAsync();
-        var json = await _officeInterop.FetchJsonAsync("api/image-snippets", _cachedToken);
-        return JsonSerializer.Deserialize<List<ImageSnippetDto>>(json, JsonOptions) ?? new();
+        await SetAuthHeaderAsync();
+        return await _http.GetFromJsonAsync<List<ImageSnippetDto>>("api/image-snippets")
+               ?? new List<ImageSnippetDto>();
     }
 
     /// <summary>
@@ -68,26 +62,23 @@ public class ApiService
     /// </summary>
     public async Task<ImageSnippetContentDto?> GetImageContentAsync(int id)
     {
-        await EnsureTokenAsync();
-        var json = await _officeInterop.FetchJsonAsync($"api/image-snippets/{id}/content", _cachedToken);
-        return JsonSerializer.Deserialize<ImageSnippetContentDto>(json, JsonOptions);
+        await SetAuthHeaderAsync();
+        return await _http.GetFromJsonAsync<ImageSnippetContentDto>($"api/image-snippets/{id}/content");
     }
 
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 
-    /// <summary>
-    /// Ensures _cachedToken is populated. If not already cached, attempts Office SSO.
-    /// Throws <see cref="OfficeAuthException"/> if no token can be obtained.
-    /// </summary>
-    private async Task EnsureTokenAsync()
+    private async Task SetAuthHeaderAsync()
     {
-        if (!string.IsNullOrEmpty(_cachedToken))
-            return;
+        if (string.IsNullOrEmpty(_cachedToken))
+        {
+            // GetOfficeTokenAsync throws OfficeAuthException on failure
+            _cachedToken = await _officeInterop.GetOfficeTokenAsync();
+        }
 
-        // GetOfficeTokenAsync throws OfficeAuthException when SSO is unavailable
-        // (e.g. Word Online, error 13006). The caller shows the Sign In button.
-        _cachedToken = await _officeInterop.GetOfficeTokenAsync();
+        _http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", _cachedToken);
     }
 }

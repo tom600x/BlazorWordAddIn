@@ -44,59 +44,6 @@ public class OfficeInteropService
         throw new OfficeAuthException(code, msg);
     }
 
-    /// <summary>
-    /// Acquires an access token via MSAL interactive login using the Office Dialog API.
-    /// Called as a fallback when <see cref="GetOfficeTokenAsync"/> fails (e.g. in Word Online).
-    /// </summary>
-    /// <returns>Raw JWT string on success.</returns>
-    /// <exception cref="OfficeAuthException">When the MSAL dialog flow fails or the user cancels.</exception>
-    public async Task<string> GetMsalTokenAsync()
-    {
-        var result = await _js.InvokeAsync<JsonElement>("officeInterop.getMsalTokenViaDialog");
-
-        if (result.GetProperty("success").GetBoolean())
-        {
-            return result.GetProperty("token").GetString()
-                ?? throw new OfficeAuthException(0, "MSAL token was null despite success flag.");
-        }
-
-        int code = result.TryGetProperty("errorCode", out var codeEl) ? codeEl.GetInt32() : 0;
-        string msg = result.TryGetProperty("errorMessage", out var msgEl)
-            ? msgEl.GetString() ?? "MSAL sign-in failed."
-            : "MSAL sign-in failed.";
-
-        throw new OfficeAuthException(code, msg);
-    }
-
-    /// <summary>
-    /// Makes a GET request via the browser's native fetch() API, bypassing Blazor's BrowserHttpHandler.
-    /// Returns the response body as a JSON string.
-    /// </summary>
-    /// <exception cref="HttpRequestException">On network error or non-2xx HTTP status.</exception>
-    public async Task<string> FetchJsonAsync(string url, string? token)
-    {
-        var result = await _js.InvokeAsync<JsonElement>("officeInterop.fetchJson", url, (object?)token);
-
-        if (result.GetProperty("ok").GetBoolean())
-            return result.GetProperty("body").GetString() ?? "null";
-
-        // fetch() threw (network-level failure: CORS, offline, etc.)
-        if (result.TryGetProperty("error", out var errEl) && errEl.ValueKind != JsonValueKind.Null)
-        {
-            var msg = errEl.GetString() ?? "Unknown fetch error";
-            throw new HttpRequestException(msg);
-        }
-
-        // HTTP error response — include the body and X-Auth-Error header for diagnostics.
-        var status = result.GetProperty("status").GetInt32();
-        var body = result.TryGetProperty("body", out var bodyEl) && bodyEl.ValueKind != JsonValueKind.Null
-            ? bodyEl.GetString() ?? ""
-            : "";
-        // fetchJson also captures X-Auth-Error as a console warning; body should contain it too.
-        var detail = string.IsNullOrWhiteSpace(body) ? $"HTTP {status} (no body)" : $"HTTP {status}: {body}";
-        throw new HttpRequestException(detail, null, (System.Net.HttpStatusCode)status);
-    }
-
     /// <summary>Inserts <paramref name="text"/> at the current Word selection.</summary>
     public async Task<bool> InsertTextAsync(string text)
     {
@@ -116,22 +63,7 @@ public class OfficeInteropService
 
     /// <summary>Returns true when the page is loaded inside an Office host.</summary>
     public async Task<bool> IsInOfficeAsync()
-    {
-        try
-        {
-            return await _js.InvokeAsync<bool>("officeInterop.isInOffice");
-        }
-        catch (JSException)
-        {
-            // JS interop failed (script not loaded or function missing) — treat as not in Office.
-            return false;
-        }
-        catch (Exception)
-        {
-            // Be conservative: on any unexpected error, report not-in-office so UI can proceed.
-            return false;
-        }
-    }
+        => await _js.InvokeAsync<bool>("officeInterop.isInOffice");
 }
 
 /// <summary>Wraps an Office SSO error code and message.</summary>
