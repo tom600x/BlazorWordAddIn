@@ -45,19 +45,4 @@ BEGIN
 END
 GO
 
--- ── AllowedUsers ──────────────────────────────────────────────────────────────
--- Grants a secondary user read access to all of an owner's snippets.
-IF OBJECT_ID(N'dbo.AllowedUsers', N'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.AllowedUsers (
-        OwnerUpn    NVARCHAR(320)    NOT NULL,
-        AllowedUpn  NVARCHAR(320)    NOT NULL,
-        GrantedUtc  DATETIME2(0)     NOT NULL CONSTRAINT DF_AllowedUsers_GrantedUtc DEFAULT SYSUTCDATETIME(),
 
-        CONSTRAINT PK_AllowedUsers PRIMARY KEY CLUSTERED (OwnerUpn, AllowedUpn)
-    );
-
-    CREATE NONCLUSTERED INDEX IX_AllowedUsers_AllowedUpn
-        ON dbo.AllowedUsers (AllowedUpn);
-END
-GO

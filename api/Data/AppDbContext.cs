@@ -9,8 +9,6 @@ public class AppDbContext : DbContext
 
     public DbSet<TextSnippet> TextSnippets => Set<TextSnippet>();
     public DbSet<ImageSnippet> ImageSnippets => Set<ImageSnippet>();
-    public DbSet<AllowedUser> AllowedUsers => Set<AllowedUser>();
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TextSnippet>(entity =>
@@ -37,14 +35,5 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.OwnerUpn);
         });
 
-        modelBuilder.Entity<AllowedUser>(entity =>
-        {
-            // Composite primary key
-            entity.HasKey(e => new { e.OwnerUpn, e.AllowedUpn });
-            entity.Property(e => e.OwnerUpn).HasMaxLength(320).IsRequired();
-            entity.Property(e => e.AllowedUpn).HasMaxLength(320).IsRequired();
-            entity.Property(e => e.GrantedUtc).HasDefaultValueSql("SYSUTCDATETIME()");
-            entity.HasIndex(e => e.AllowedUpn); // query by the allowed user's UPN
-        });
     }
 }

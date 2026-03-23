@@ -19,8 +19,7 @@ public class TextSnippetsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns all text snippets visible to the authenticated user
-    /// (owned + shared-with-me).
+    /// Returns all text snippets owned by the authenticated user.
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<IEnumerable<TextSnippetDto>>> GetAsync()

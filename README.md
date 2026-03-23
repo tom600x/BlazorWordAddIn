@@ -34,7 +34,6 @@ Word Desktop / Word Online
 │  Azure SQL Database           │
 │  - TextSnippets               │
 │  - ImageSnippets              │
-│  - AllowedUsers               │
 └───────────────────────────────┘
 ```
 

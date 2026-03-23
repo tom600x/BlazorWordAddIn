@@ -208,7 +208,7 @@ The Blazor UI reads this value from the API configuration endpoint and displays 
 - All tokens are short-lived JWTs (1 hour default) validated by the backend on every request.
 - Azure SQL uses Managed Identity — no SQL passwords are stored, transmitted, or rotated.
 - All traffic is TLS 1.2+; HTTP is redirected to HTTPS at the App Service level.
-- The only users who can see snippets are the owners or users explicitly granted access via `dbo.AllowedUsers`.
+- Each user can only see their own snippets, scoped by their UPN.
 - The add-in does not write to Word documents without explicit user action (clicking the **Insert** button).
 
 ---

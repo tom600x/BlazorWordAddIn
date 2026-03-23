@@ -261,20 +261,4 @@ Azure SQL Database
 
 ---
 
-## 6. Sharing Snippets Between Users
 
-Snippets are private by default. To share a user's snippets with another user, insert a row into the `AllowedUsers` table:
-
-```sql
--- Allow bob to see all of alice's snippets
-INSERT INTO dbo.AllowedUsers (OwnerUpn, AllowedUpn)
-VALUES (N'alice@contoso.com', N'bob@contoso.com');
-```
-
-The `AllowedUpn` user sees the owner's snippets in addition to their own. Sharing is one-directional; to share both ways, insert two rows.
-
-To remove sharing:
-```sql
-DELETE FROM dbo.AllowedUsers
-WHERE OwnerUpn = N'alice@contoso.com' AND AllowedUpn = N'bob@contoso.com';
-```

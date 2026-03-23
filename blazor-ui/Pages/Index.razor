@@ -260,7 +260,6 @@ else
 
     private async Task RefreshAsync()
     {
-        ApiService.InvalidateToken();
         needsSignIn = false;
         await LoadDataAsync();
     }

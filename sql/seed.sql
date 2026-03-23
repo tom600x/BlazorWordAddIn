@@ -84,11 +84,5 @@ IF NOT EXISTS (SELECT 1 FROM dbo.ImageSnippets WHERE OwnerUpn = @user2 AND Title
     INSERT INTO dbo.ImageSnippets (OwnerUpn, Title, ImageBase64, MimeType, Tags)
     VALUES (@user2, N'Agency Logo Placeholder', @testImageB64, N'image/png', N'logo,branding');
 
--- ── Allowed Users (sharing) ───────────────────────────────────────────────────
--- bob can see all of alice's snippets
-IF NOT EXISTS (SELECT 1 FROM dbo.AllowedUsers WHERE OwnerUpn = @user1 AND AllowedUpn = @user2)
-    INSERT INTO dbo.AllowedUsers (OwnerUpn, AllowedUpn)
-    VALUES (@user1, @user2);
-
 COMMIT TRANSACTION;
 PRINT 'Seed data inserted successfully.';

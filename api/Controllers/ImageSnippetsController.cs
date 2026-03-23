@@ -19,7 +19,7 @@ public class ImageSnippetsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns image snippet summaries (no base64 payload) visible to the user.
+    /// Returns image snippet summaries (no base64 payload) owned by the authenticated user.
     /// The full image is fetched lazily via GET /{id}/content.
     /// </summary>
     [HttpGet]
