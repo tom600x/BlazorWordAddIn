@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  Office Add-in Manifest — LOCAL DEVELOPMENT version.
+  All URLs point to https://localhost:7001 (the API project, which also hosts the Blazor WASM files).
+  
+  Use this manifest with:
+    npx office-addin-dev-certs install     (one-time: trust the Office dev SSL cert)
+    npx office-addin-debugging start add-in/manifest.localhost.xml desktop
+  
+  Or sideload manually:
+    Word → Insert → Add-ins → My Add-ins → Upload My Add-in → browse to this file.
+  
+  Do NOT deploy this manifest to production — use manifest.xml instead.
+-->
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <Id>ea71142f-eec4-4531-8419-765678e0c703</Id>
+  <Version>1.0.0.1</Version>
+  <ProviderName>Contoso</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Word Snippets (Dev)"/>
+  <Description DefaultValue="LOCAL DEV — Insert reusable text and image snippets into Word documents."/>
+  <IconUrl DefaultValue="https://localhost:7001/assets/icon-80.png"/>
+  <HighResolutionIconUrl DefaultValue="https://localhost:7001/assets/icon-80.png"/>
+  <SupportUrl DefaultValue="https://localhost:7001"/>
+
+  <AppDomains>
+    <AppDomain>https://localhost:7001</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Document"/>
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:7001/"/>
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+
+          <GetStarted>
+            <Title resid="GetStarted.Title"/>
+            <Description resid="GetStarted.Description"/>
+            <LearnMoreUrl resid="HelpUrl"/>
+          </GetStarted>
+
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="SnippetsGroup">
+                <Label resid="SnippetsGroup.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16"/>
+                  <bt:Image size="32" resid="Icon.32x32"/>
+                  <bt:Image size="80" resid="Icon.80x80"/>
+                </Icon>
+                <Control xsi:type="Button" id="OpenSnippetsButton">
+                  <Label resid="OpenButton.Label"/>
+                  <Supertip>
+                    <Title resid="OpenButton.Label"/>
+                    <Description resid="OpenButton.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>SnippetsTaskpane</TaskpaneId>
+                    <SourceLocation resid="TaskpaneUrl"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:7001/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:7001/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:7001/assets/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="TaskpaneUrl"    DefaultValue="https://localhost:7001/"/>
+        <bt:Url id="HelpUrl"        DefaultValue="https://localhost:7001/"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title"    DefaultValue="Get started with Word Snippets"/>
+        <bt:String id="SnippetsGroup.Label" DefaultValue="Snippets"/>
+        <bt:String id="OpenButton.Label"    DefaultValue="Open Snippets"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Open the task pane to insert reusable text and image snippets into your document."/>
+        <bt:String id="OpenButton.Tooltip"     DefaultValue="Open the Word Snippets task pane to browse and insert snippets."/>
+      </bt:LongStrings>
+    </Resources>
+
+    <!--
+      SSO / WebApplicationInfo
+      For local dev, the Resource URI must include localhost.
+      You must add api://localhost:7001/CLIENT_ID as an Application ID URI
+      in the Entra app registration (Expose an API) for SSO to work locally.
+      If SSO fails, the MSAL fallback dialog will handle sign-in.
+    -->
+    <WebApplicationInfo>
+      <Id>c7806dca-7fab-4e78-bf17-d3f977b3eea4</Id>
+      <Resource>api://localhost:7001/c7806dca-7fab-4e78-bf17-d3f977b3eea4</Resource>
+      <Scopes>
+        <Scope>openid</Scope>
+        <Scope>profile</Scope>
+        <Scope>User.Read</Scope>
+        <Scope>offline_access</Scope>
+      </Scopes>
+    </WebApplicationInfo>
+
+  </VersionOverrides>
+</OfficeApp>

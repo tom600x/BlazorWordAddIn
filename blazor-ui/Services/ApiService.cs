@@ -17,6 +17,9 @@ public class ApiService
     // Token lifetime is typically 1 hour; a real app would check expiry (the JWT "exp" claim).
     private string? _cachedToken;
 
+    // Serialize token acquisition – Office.auth.getAccessToken() only allows one call at a time.
+    private readonly SemaphoreSlim _tokenLock = new(1, 1);
+
     public ApiService(HttpClient http, OfficeInteropService officeInterop)
     {
         _http = http;
@@ -37,14 +40,14 @@ public class ApiService
     public async Task<UserInfoDto?> GetMeAsync()
     {
         await SetAuthHeaderAsync();
-        return await _http.GetFromJsonAsync<UserInfoDto>("api/me");
+        return await GetAsync<UserInfoDto>("api/me");
     }
 
     /// <summary>Gets the text snippets accessible to the signed-in user.</summary>
     public async Task<List<TextSnippetDto>> GetTextSnippetsAsync()
     {
         await SetAuthHeaderAsync();
-        return await _http.GetFromJsonAsync<List<TextSnippetDto>>("api/text-snippets")
+        return await GetAsync<List<TextSnippetDto>>("api/text-snippets")
                ?? new List<TextSnippetDto>();
     }
 
@@ -52,7 +55,7 @@ public class ApiService
     public async Task<List<ImageSnippetDto>> GetImageSnippetsAsync()
     {
         await SetAuthHeaderAsync();
-        return await _http.GetFromJsonAsync<List<ImageSnippetDto>>("api/image-snippets")
+        return await GetAsync<List<ImageSnippetDto>>("api/image-snippets")
                ?? new List<ImageSnippetDto>();
     }
 
@@ -63,20 +66,51 @@ public class ApiService
     public async Task<ImageSnippetContentDto?> GetImageContentAsync(int id)
     {
         await SetAuthHeaderAsync();
-        return await _http.GetFromJsonAsync<ImageSnippetContentDto>($"api/image-snippets/{id}/content");
+        return await GetAsync<ImageSnippetContentDto>($"api/image-snippets/{id}/content");
+    }
+
+    /// <summary>
+    /// GET helper that reads the response body on error so the actual server
+    /// error message is surfaced instead of a generic "500 Internal Server Error".
+    /// </summary>
+    private async Task<T?> GetAsync<T>(string url)
+    {
+        var response = await _http.GetAsync(url);
+        if (response.IsSuccessStatusCode)
+            return await response.Content.ReadFromJsonAsync<T>();
+
+        var body = await response.Content.ReadAsStringAsync();
+        // Truncate long error bodies for display
+        if (body.Length > 500) body = body[..500];
+        throw new HttpRequestException(
+            $"{(int)response.StatusCode} {response.ReasonPhrase}: {body}",
+            null,
+            response.StatusCode);
     }
 
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 
+    /// <summary>
+    /// Acquires the token once and caches it. Safe to call from parallel tasks.
+    /// </summary>
+    public async Task EnsureTokenAsync()
+    {
+        if (!string.IsNullOrEmpty(_cachedToken)) return;
+
+        await _tokenLock.WaitAsync();
+        try
+        {
+            if (string.IsNullOrEmpty(_cachedToken))
+                _cachedToken = await _officeInterop.GetOfficeTokenAsync();
+        }
+        finally { _tokenLock.Release(); }
+    }
+
     private async Task SetAuthHeaderAsync()
     {
-        if (string.IsNullOrEmpty(_cachedToken))
-        {
-            // GetOfficeTokenAsync throws OfficeAuthException on failure
-            _cachedToken = await _officeInterop.GetOfficeTokenAsync();
-        }
+        await EnsureTokenAsync();
 
         _http.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", _cachedToken);

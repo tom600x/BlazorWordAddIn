@@ -55,9 +55,15 @@
 
     <script>
         Office.onReady(async function () {
-            var CLIENT_ID  = 'c7806dca-7fab-4e78-bf17-d3f977b3eea4';
-            var TENANT_ID  = '17784004-2abc-4e6e-ade2-374b35b35643';
-            var SCOPE      = 'api://tomwordaddin.azurewebsites.net/c7806dca-7fab-4e78-bf17-d3f977b3eea4/access_as_user';
+            // Load ClientId and TenantId from appsettings.json
+            var settings = await fetch('appsettings.json').then(function (r) { return r.json(); });
+            var CLIENT_ID  = settings.AzureAd.ClientId;
+            var TENANT_ID  = settings.AzureAd.TenantId;
+            // Build scope dynamically so it works for both localhost dev and production
+            var HOST = window.location.hostname === 'localhost'
+                ? 'localhost:' + window.location.port
+                : 'tomwordaddin.azurewebsites.net';
+            var SCOPE      = 'api://' + HOST + '/' + CLIENT_ID + '/access_as_user';
             var REDIRECT   = window.location.origin + '/auth.html';
 
             var msalConfig = {

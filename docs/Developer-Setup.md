@@ -114,20 +114,67 @@ dotnet run
 
 ---
 
-## 8. Sideload the Add-in in Word Desktop
+## 8. Sideload the Add-in (npm Sideloader — No Admin Rights Needed)
 
-Before sideloading, update `add-in/manifest.xml` to use the local dev URL:
+The repository includes two manifests:
 
-1. Open `add-in/manifest.xml`.
-2. Find every `<SourceLocation DefaultValue="https://tomwordaddin.azurewebsites.net/...">` attribute.
-3. Replace the hostname with `https://localhost:7000` for local dev.
+| File | Purpose |
+|---|---|
+| `add-in/manifest.xml` | **Production** — URLs point to `tomwordaddin.azurewebsites.net` |
+| `add-in/manifest.localhost.xml` | **Local dev** — URLs point to `https://localhost:7001` |
 
-Then sideload:
+### One-Time Setup
+
+```powershell
+# Install Office dev SSL certificates (trusted by Word)
+npx office-addin-dev-certs install
+
+# Trust the .NET dev cert (if not already done in Step 4)
+dotnet dev-certs https --trust
+```
+
+### Start Everything with One Command
+
+From the repository root:
+
+```powershell
+.\start-dev.ps1
+```
+
+This script:
+
+1. Builds and starts the API on `https://localhost:7001` (background job).
+2. Waits for the server to be ready.
+3. Runs `npx office-addin-debugging start` which sideloads the add-in into Word Desktop.
+
+Press **Ctrl+C** to stop — the script cleans up the background API and removes the sideloaded manifest from Word.
+
+### Manual Sideload (Alternative)
+
+If you prefer to start the app and sideloader separately:
+
+```powershell
+# Terminal 1 — start the API
+cd api
+dotnet run
+
+# Terminal 2 — register the manifest in the Windows registry and open Word
+npx office-addin-dev-settings sideload add-in\manifest.localhost.xml
+start winword
+```
+
+To remove the sideloaded add-in:
+
+```powershell
+npx office-addin-dev-settings unload add-in\manifest.localhost.xml
+```
+
+### Manual Upload (No npm)
 
 1. Open **Microsoft Word**.
 2. **Insert** → **Add-ins** → **My Add-ins** → **Upload My Add-in**.
-3. Browse to `add-in/manifest.xml` and click **Upload**.
-4. The **Word Snippets** button appears in the **Home** ribbon.
+3. Browse to `add-in/manifest.localhost.xml` and click **Upload**.
+4. The **Word Snippets (Dev)** button appears in the **Home** ribbon.
 
 ---
 
@@ -215,9 +262,12 @@ Add a `.vscode/launch.json` compound launch that starts both the API and Blazor-
 
 | Task | Command |
 |---|---|
-| Run API | `cd api && dotnet run` |
-| Run Blazor WASM | `cd blazor-ui && dotnet run` |
+| **Start app + sideloader** | `.\start-dev.ps1` |
+| Run API only | `cd api && dotnet run` |
 | Build entire solution | `dotnet build BlazorWordAddIn.sln` |
+| Sideload manually | `npx office-addin-dev-settings sideload add-in\manifest.localhost.xml` |
+| Remove sideloaded add-in | `npx office-addin-dev-settings unload add-in\manifest.localhost.xml` |
+| Install Office dev certs | `npx office-addin-dev-certs install` |
 | List user secrets | `cd api && dotnet user-secrets list` |
 | Add EF migration | `cd api && dotnet ef migrations add <Name>` |
 | Apply migrations | `cd api && dotnet ef database update` |

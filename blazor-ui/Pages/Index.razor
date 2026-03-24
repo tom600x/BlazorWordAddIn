@@ -207,6 +207,10 @@ else
 
         try
         {
+            // Acquire the SSO token once before parallel calls – Office only
+            // allows a single getAccessToken() call at a time (errors 13007/13013).
+            await ApiService.EnsureTokenAsync();
+
             // Load user identity and snippets in parallel
             var meTask = ApiService.GetMeAsync();
             var textTask = ApiService.GetTextSnippetsAsync();
@@ -225,7 +229,7 @@ else
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
             ApiService.InvalidateToken();
-            errorMessage = "Your session has expired. Please close and reopen the task pane.";
+            errorMessage = $"Authentication failed (401). {ex.Message} — Please close and reopen the task pane.";
         }
         catch (Exception ex)
         {

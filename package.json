@@ -1,0 +1,11 @@
+{
+  "name": "blazor-word-addin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Word Snippets Office Add-in (sideloader support)",
+  "scripts": {
+    "sideload": "npx office-addin-dev-settings sideload add-in/manifest.localhost.xml",
+    "unload": "npx office-addin-dev-settings unload add-in/manifest.localhost.xml",
+    "install-certs": "npx office-addin-dev-certs install"
+  }
+}
