@@ -55,14 +55,12 @@
 
     <script>
         Office.onReady(async function () {
-            // Load ClientId and TenantId from appsettings.json
+            // Load settings from appsettings.json (no hardcoded values)
             var settings = await fetch('appsettings.json').then(function (r) { return r.json(); });
             var CLIENT_ID  = settings.AzureAd.ClientId;
             var TENANT_ID  = settings.AzureAd.TenantId;
-            // Build scope dynamically so it works for both localhost dev and production
-            var HOST = window.location.hostname === 'localhost'
-                ? 'localhost:' + window.location.port
-                : 'tomwordaddin.azurewebsites.net';
+            // Derive host from ApiBaseUrl (e.g. "https://localhost:7001" → "localhost:7001")
+            var HOST = new URL(settings.ApiBaseUrl).host;
             var SCOPE      = 'api://' + HOST + '/' + CLIENT_ID + '/access_as_user';
             var REDIRECT   = window.location.origin + '/auth.html';
 
