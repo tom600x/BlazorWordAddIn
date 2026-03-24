@@ -55,3 +55,4 @@ infra/arm-output.json
 *.tfstate
 *.tfstate.backup
 publish_out.zip
+publish_out.zip
